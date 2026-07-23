@@ -10,6 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY static ./static
 
 ENV PORT=8080 \
     UPLOAD_DIR=/srv/uploads \

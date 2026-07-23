@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from app.database import init_db
@@ -43,3 +44,5 @@ def health() -> dict:
 @app.get("/metrics", tags=["ops"])
 def metrics() -> Response:
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+app.mount("/", StaticFiles(directory="static", html=True), name="ui")

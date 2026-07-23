@@ -23,6 +23,11 @@ def get_review_queue(db: Session = Depends(get_db)) -> List[ReviewItem]:
     )
     items: List[ReviewItem] = []
     for doc in docs:
+        try:
+            extraction = InvoiceSchema.model_validate_json(doc.extracted_json)
+        except Exception:
+            logger.warning("doc %s has an incompatible extraction schema, skipping", doc.id)
+            continue
         flagged_rows = (
             db.query(ReviewQueueItem)
             .filter(ReviewQueueItem.doc_id == doc.id, ReviewQueueItem.status == "pending")
@@ -33,7 +38,7 @@ def get_review_queue(db: Session = Depends(get_db)) -> List[ReviewItem]:
                 doc_id=doc.id,
                 filename=doc.filename,
                 created_at=doc.created_at,
-                extraction=InvoiceSchema.model_validate_json(doc.extracted_json),
+                extraction=extraction,
                 flagged_fields=[
                     FlaggedField(
                         field_path=r.field_path, value=r.value, confidence=r.confidence

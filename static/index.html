@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f3ea">
+  <meta name="api-base" content="http://localhost:8000">
+  <title>LedgerLens - receipts and invoices</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header id="topnav" class="topnav">
+    <div class="nav-inner">
+      <button class="ll-wordmark brand-btn" type="button" data-page="home" aria-label="Open home">
+        <span class="ll-mark" aria-hidden="true">LL</span>
+        <span class="ll-brand-text">LedgerLens</span>
+      </button>
+
+      <nav id="nav" class="nav-list" aria-label="Main navigation">
+        <button class="nav-btn" type="button" data-page="home">Home</button>
+        <button class="nav-btn" type="button" data-page="upload">Extract</button>
+        <button class="nav-btn" type="button" data-page="review">Review</button>
+        <button class="nav-btn" type="button" data-page="ledger">Ledger</button>
+      </nav>
+
+      <button id="theme" class="theme-btn" type="button">Dark</button>
+    </div>
+  </header>
+
+  <main id="main" class="main" tabindex="-1"></main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <noscript>
+    <div class="no-js">JavaScript is required to use LedgerLens.</div>
+  </noscript>
+</body>
+</html>

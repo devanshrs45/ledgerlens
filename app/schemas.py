@@ -108,6 +108,8 @@ class DocumentSummary(BaseModel):
     currency: Optional[str] = None
     created_at: datetime
     cost_usd: float = 0.0
+    blocked_reason: Optional[str] = None
+    extraction: Optional[InvoiceSchema] = None
 
 
 class RejectRequest(BaseModel):

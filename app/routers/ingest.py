@@ -16,6 +16,7 @@ from app.watermark import apply_watermark, resize_for_vision
 
 router = APIRouter()
 logger = logging.getLogger("ledgerlens.ingest")
+_INGEST_TIMES: list[float] = []
 
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/jpg"}
 
@@ -93,6 +94,11 @@ async def ingest_document(
     db.commit()
 
     metrics.DOCS_INGESTED.labels(status=status).inc()
+    now = time.time()
+    _INGEST_TIMES.append(now)
+    while _INGEST_TIMES and now - _INGEST_TIMES[0] > 60:
+        _INGEST_TIMES.pop(0)
+    metrics.THROUGHPUT_DPM.set(len(_INGEST_TIMES))
     if status == "auto_approved":
         metrics.AUTO_APPROVALS.inc()
     else:

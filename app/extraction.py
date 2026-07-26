@@ -87,7 +87,7 @@ def extract_invoice(image_bytes: bytes, mime: str = "image/png") -> ExtractionRe
             messages=_messages(b64, mime, schema_hint),
             response_format={"type": "json_object"},
             temperature=0,
-            max_tokens=3500,
+            max_tokens=2500,
             reasoning_effort="none"
         )
         raw = _strip_fences(completion.choices[0].message.content or "{}")

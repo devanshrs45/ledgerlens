@@ -42,3 +42,9 @@ PENDING_REVIEW_GAUGE = Gauge(
     "pending_review_documents",
     "Documents currently sitting in the human review queue"
 )
+
+
+THROUGHPUT_DPM = Gauge(
+    "throughput_docs_per_minute",
+    "Documents ingested per minute, measured over the last batch",
+)

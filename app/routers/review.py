@@ -121,12 +121,19 @@ def list_documents(limit: int = 50, db: Session = Depends(get_db)) -> List[Docum
     out: List[DocumentSummary] = []
     for d in docs:
         vendor = total = currency = None
+        extraction = None
         source = d.reviewed_json or d.extracted_json
+
         if source:
             data = json.loads(source)
             vendor = data.get("vendor", {}).get("value")
             total = data.get("total", {}).get("value")
             currency = data.get("currency", {}).get("value")
+            try:
+                extraction = InvoiceSchema(**data)
+            except Exception:
+                extraction = None  # older record, schema has moved on
+
         out.append(
             DocumentSummary(
                 doc_id=d.id,
@@ -137,9 +144,11 @@ def list_documents(limit: int = 50, db: Session = Depends(get_db)) -> List[Docum
                 currency=currency,
                 created_at=d.created_at,
                 cost_usd=d.cost_usd or 0.0,
+                blocked_reason=d.blocked_reason,
+                extraction=extraction,
             )
         )
-    
+        
     return out
 
 

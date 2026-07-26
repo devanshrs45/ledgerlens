@@ -11,7 +11,7 @@
   const rawBase = $("meta[name='api-base']")?.content || "http://localhost:8000";
   const base = rawBase.replace(/\/$/, "");
 
-  const pages = new Set(["home", "upload", "review", "ledger"]);
+  const pages = new Set(["home", "upload", "review", "records"]);
   const cash = new Set(["subtotal", "tax", "discount", "additional_charges", "total"]);
   const keys = [
     "vendor", "invoice_number", "date", "currency",
@@ -21,20 +21,23 @@
     "var(--red)", "var(--orange)", "var(--amber)", "var(--green)",
     "var(--teal)", "var(--blue)", "var(--violet)",
   ];
+  const MAX_BATCH = 25;
+  const GAP_MS = 900;
   const states = {
     auto_approved: ["ok", "auto approved"],
     approved: ["ok", "approved"],
     pending_review: ["pending", "pending review"],
     blocked: ["bad", "blocked"],
     rejected: ["bad", "rejected"],
+    error: ["bad", "failed"],
   };
 
   const mem = {
     page: read("ll-page", "home"),
     theme: read("ll-theme", ""),
     open: read("ll-open", ""),
-    file: null,
-    url: "",
+    files: [],
+    urls: [],
     turn: 0,
     timer: 0,
   };
@@ -84,6 +87,113 @@
   function cost(v, d = 5) {
     const x = Number(v);
     return Number.isFinite(x) ? `$${x.toFixed(d)}` : "$0.00000";
+  }
+
+  function wait(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  function csvText(rows) {
+    const head = [
+      "filename", "doc_id", "status", "vendor",
+      "total", "currency", "held_fields", "cost_usd",
+    ];
+
+    const body = rows.map((r) => [
+      r.name, r.doc_id, r.status, r.vendor,
+      r.totalRaw, r.currency, r.flagged, r.costRaw,
+    ]);
+
+    return [head, ...body]
+      .map((cols) =>
+        cols
+          .map((cell) => {
+            const s = String(cell ?? "");
+            return /[",\n]/.test(s)
+              ? `"${s.replaceAll('"', '""')}"`
+              : s;
+          })
+          .join(","),
+      )
+      .join("\n");
+  }
+
+  function download(text, name) {
+    const blob = new Blob([text], {
+      type: "text/csv;charset=utf-8",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+
+    a.href = url;
+    a.download = name;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function batchRow(r, i) {
+    const can = Boolean(r.extraction) || Boolean(r.detail);
+
+    const inner = r.extraction
+      ? `<div class="batch-detail-grid">
+           <div>
+             ${
+               r.img
+                 ? `<img
+                      class="ll-doc-img"
+                      src="${esc(join(r.img))}"
+                      alt="Processed document ${esc(r.doc_id)}"
+                    >
+                    <p class="caption">
+                      The document id and UTC time are shown in the lower right.
+                    </p>`
+                 : ""
+             }
+           </div>
+           <div>${grid(r.extraction)}${flags(r.held)}</div>
+         </div>`
+      : banner("bad", esc(r.detail || "No details available."));
+
+    return `
+      <tr>
+        <td>
+          ${esc(r.name)}
+          ${
+            r.doc_id
+              ? `<br><span class="batch-why">${esc(r.doc_id)}</span>`
+              : ""
+          }
+        </td>
+        <td>${chip(r.status)}</td>
+        <td>${esc(r.vendor || "-")}</td>
+        <td class="num money">${esc(r.total)}</td>
+        <td class="num">${r.flagged || "-"}</td>
+        <td class="num">${cost(r.costRaw)}</td>
+        <td class="num">
+          ${
+            can
+              ? `<button
+                   class="batch-more"
+                   type="button"
+                   data-more="${i}"
+                   aria-expanded="false"
+                   aria-label="Show details for ${esc(r.name)}"
+                 >&#9656;</button>`
+              : ""
+          }
+        </td>
+      </tr>
+
+      <tr class="batch-detail" data-row="${i}" hidden>
+        <td colspan="7">
+          <div class="batch-detail-in">${inner}</div>
+        </td>
+      </tr>`;
   }
 
   function join(path) {
@@ -179,14 +289,15 @@
     mem.theme = dark ? "dark" : "light";
     document.documentElement.dataset.theme = mem.theme;
 
-    modeBtn.textContent = dark ? "Light" : "Dark";
-    modeBtn.title = dark ? "Use light mode" : "Use dark mode";
+    const glyph = $("span", modeBtn);
+    if (glyph) {
+      glyph.innerHTML = dark ? "&#9789;" : "&#9788;";
+    }
+
+    modeBtn.title = dark ? "Switch to light mode" : "Switch to dark mode";
     modeBtn.setAttribute("aria-label", modeBtn.title);
 
-    tag?.setAttribute(
-      "content",
-      dark ? "#0f1820" : "#f7f3ea",
-    );
+    tag?.setAttribute("content", dark ? "#0f1820" : "#f7f3ea");
 
     if (store) {
       save("ll-theme", mem.theme, true);
@@ -440,8 +551,8 @@
       review();
     }
 
-    if (page === "ledger") {
-      ledger();
+    if (page === "records") {
+      records();
     }
   }
 
@@ -460,7 +571,7 @@
 
               <h2>
                 Upload a receipt or invoice, check the details,
-                and save it to the ledger.
+                and save it to the records.
               </h2>
             </div>
 
@@ -565,61 +676,77 @@
     }
   }
 
-  function upload() {
-    const has = mem.file instanceof File;
+function upload() {
+    const files = mem.files;
+    const has = files.length > 0;
+
+    mem.urls.forEach((u) => URL.revokeObjectURL(u));
+    mem.urls = [];
 
     let preview = `
       <div class="ll-empty-preview">
         <div class="ll-empty-icon"></div>
-        <b>No file selected</b>
-        <p>Your receipt will appear here.</p>
+        <b>No files selected</b>
+        <p>Your receipts will appear here.</p>
       </div>`;
 
     if (has) {
-      if (mem.url) {
-        URL.revokeObjectURL(mem.url);
-      }
+      const kb = files.reduce((n, f) => n + f.size, 0) / 1024;
 
-      mem.url = URL.createObjectURL(mem.file);
+      const thumbs = files
+        .map((f, i) => {
+          const u = URL.createObjectURL(f);
+          mem.urls.push(u);
+
+          return `
+            <figure class="batch-thumb">
+              <img src="${esc(u)}" alt="${esc(f.name)}">
+
+              <button
+                class="batch-drop"
+                type="button"
+                data-drop="${i}"
+                aria-label="Remove ${esc(f.name)}"
+              >x</button>
+
+              <figcaption>${esc(f.name)}</figcaption>
+            </figure>`;
+        })
+        .join("");
 
       preview = `
         <div class="preview-card">
-          <img
-            src="${esc(mem.url)}"
-            alt="Selected receipt or invoice preview"
-          >
+          <div class="batch-strip">${thumbs}</div>
 
           <div class="ll-file-meta">
-            <span>${esc(mem.file.name)}</span>
-            <span>
-              ${Math.round(
-                mem.file.size / 1024,
-              ).toLocaleString()} KB
-            </span>
+            <span>${files.length} file${
+              files.length === 1 ? "" : "s"
+            } ready</span>
+            <span>${Math.round(kb).toLocaleString()} KB total</span>
           </div>
         </div>`;
     }
 
     box.innerHTML = `
       ${head(
-        "Extract document",
-        "Choose a JPG or PNG. Review the result after it is read.",
+        "Extract documents",
+        "Choose one or more JPG or PNG files. They are read one after another.",
       )}
 
       <section class="upload-workspace">
         <div class="upload-grid">
           <div>
             <div class="ll-upload-copy">
-              <h3>Choose a file</h3>
+              <h3>Choose files</h3>
 
               <p>
-                Use one clear receipt or invoice.
+                Add a single receipt or a whole batch.
               </p>
 
               <div class="ll-upload-help">
                 <span>JPG or PNG</span>
                 <span>One document per image</span>
-                <span>Fix fields when needed</span>
+                <span>Up to ${MAX_BATCH} per batch</span>
               </div>
             </div>
 
@@ -629,11 +756,12 @@
                 id="file"
                 type="file"
                 accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                multiple hidden
               >
 
               <span class="dropzone-inner">
-                <b>Drop a receipt or invoice</b>
-                <small>JPG or PNG</small>
+                <b>Drop receipts or invoices</b>
+                <small>JPG or PNG, one or many</small>
                 <span class="choose-btn">Browse files</span>
               </span>
             </label>
@@ -645,14 +773,24 @@
                 type="button"
                 ${has ? "" : "disabled"}
               >
-                Extract document
+                ${
+                  has
+                    ? `Extract ${files.length} document${
+                        files.length === 1 ? "" : "s"
+                      }`
+                    : "Extract documents"
+                }
               </button>
 
               <p class="upload-note">
                 ${
                   has
-                    ? "Ready to extract."
-                    : "Choose a file to start."
+                    ? `Files are read one at a time. About ${fmtLeft(
+                        Math.round((files.length * (12000 + GAP_MS)) / 1000),
+                      )} for ${files.length} file${
+                        files.length === 1 ? "" : "s"
+                      }.`
+                    : "Choose files to start."
                 }
               </p>
             </div>
@@ -670,7 +808,8 @@
     const drop = $("#drop", box);
 
     input.addEventListener("change", () => {
-      pick(input.files?.[0]);
+      pick(input.files);
+      input.value = "";
     });
 
     drop.addEventListener("dragover", (e) => {
@@ -685,32 +824,150 @@
     drop.addEventListener("drop", (e) => {
       e.preventDefault();
       drop.classList.remove("drag");
-      pick(e.dataTransfer?.files?.[0]);
+      pick(e.dataTransfer?.files);
+    });
+
+    $$("[data-drop]", box).forEach((b) => {
+      b.addEventListener("click", () => {
+        mem.files.splice(Number(b.dataset.drop), 1);
+        upload();
+      });
     });
 
     $("#run", box).addEventListener("click", ingest);
   }
 
-  function pick(file) {
-    if (!file) {
+  function pick(list) {
+    const incoming = [...(list || [])];
+
+    if (!incoming.length) {
       return;
     }
 
-    const ok =
-      ["image/jpeg", "image/png"].includes(file.type) ||
-      /\.(jpe?g|png)$/i.test(file.name);
+    const good = incoming.filter(
+      (f) =>
+        ["image/jpeg", "image/png"].includes(f.type) ||
+        /\.(jpe?g|png)$/i.test(f.name),
+    );
 
-    if (!ok) {
-      toast("Choose a JPG or PNG file.");
+    if (!good.length) {
+      toast("Choose JPG or PNG files.");
       return;
     }
 
-    mem.file = file;
+    const room = Math.max(MAX_BATCH - mem.files.length, 0);
+    const added = good.slice(0, room);
+
+    mem.files = mem.files.concat(added);
+
+    const skipped = incoming.length - good.length;
+
+    if (skipped) {
+      toast(
+        `${skipped} file${
+          skipped === 1 ? "" : "s"
+        } skipped. JPG or PNG only.`,
+      );
+    } else if (added.length < good.length) {
+      toast(`Limit is ${MAX_BATCH} files per batch.`);
+    }
+
     upload();
   }
 
+  async function ingestOne(file, attempt = 0) {
+    const out = {
+      name: file.name,
+      doc_id: "",
+      status: "error",
+      vendor: "",
+      currency: "",
+      total: "-",
+      totalRaw: "",
+      flagged: 0,
+      costRaw: 0,
+      detail: "",
+      extraction: null,
+      held: [],
+      img: "",
+    };
+
+    const data = new FormData();
+    data.append("file", file, file.name);
+
+    let r;
+
+    try {
+      r = await fetch(join("/ingest"), {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: data,
+      });
+    } catch (e) {
+      out.detail = `API unreachable: ${e.message}`;
+      return out;
+    }
+
+    if (r.status === 429 && attempt < 3) {
+      await wait(3000 * (attempt + 1));
+      return ingestOne(file, attempt + 1);
+    }
+
+    if (r.status === 422) {
+      out.status = "blocked";
+
+      try {
+        const d = await r.json();
+        out.doc_id = String(d?.detail?.doc_id ?? "");
+        out.detail =
+          d?.detail?.blocked_reason ||
+          "Blocked by the moderation gate.";
+      } catch {
+        out.detail = "Blocked by the moderation gate.";
+      }
+
+      return out;
+    }
+
+    if (!r.ok) {
+      out.detail = await msg(r);
+      return out;
+    }
+
+    let d;
+
+    try {
+      d = await r.json();
+    } catch {
+      out.detail = "The API returned an unreadable response.";
+      return out;
+    }
+
+    const ex = d.extraction || {};
+    const total = Number(ex?.total?.value);
+
+    out.doc_id = String(d.doc_id ?? "");
+    out.status = String(d.status ?? "");
+    out.vendor = String(ex?.vendor?.value ?? "");
+    out.currency = String(ex?.currency?.value ?? "");
+    out.totalRaw = Number.isFinite(total) ? total : "";
+    out.total = Number.isFinite(total) ? num(total) : "-";
+    out.flagged = Array.isArray(d.flagged_fields)
+      ? d.flagged_fields.length
+      : 0;
+    out.costRaw = Number(d.cost_usd) || 0;
+    out.extraction = ex;
+    out.held = Array.isArray(d.flagged_fields) ? d.flagged_fields : [];
+    out.img = String(d.watermarked_image_url || "");
+
+
+    return out;
+  }
+
   async function ingest() {
-    if (!(mem.file instanceof File)) {
+    const files = mem.files.slice();
+
+    if (!files.length) {
       return;
     }
 
@@ -721,157 +978,135 @@
     btn.disabled = true;
 
     out.innerHTML = `
-      <div class="ll-rule">
-        Extraction result
+      <div class="ll-rule">Extraction results</div>
+
+      <div class="batch-progress">
+        <div class="batch-progress-bar">
+          <span id="pbar"></span>
+        </div>
+        <p class="batch-progress-text" id="ptext">
+          Starting...
+        </p>
       </div>
 
-      <div class="loader">
-        Reading the document...
-      </div>`;
+      <div class="ll-table-wrap">
+        <table class="ll-table">
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>Status</th>
+              <th>Vendor</th>
+              <th>Total</th>
+              <th>Held</th>
+              <th>Cost</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="brows"></tbody>
+        </table>
+      </div>
 
-    const data = new FormData();
+      <div class="batch-actions" id="bactions"></div>`;
 
-    data.append(
-      "file",
-      mem.file,
-      mem.file.name,
-    );
+    const bar = $("#pbar", box);
+    const text = $("#ptext", box);
+    const rows = $("#brows", box);
+    const done = [];
+    const started = Date.now();
 
-    let r;
+    rows.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-more]");
+      if (!b) return;
 
-    try {
-      r = await fetch(join("/ingest"), {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-        },
-        body: data,
-      });
-    } catch (e) {
-      if (
-        turn === mem.turn &&
-        mem.page === "upload"
-      ) {
-        out.innerHTML = `
-          <div class="ll-rule">
-            Extraction result
-          </div>
+      const panel = $(
+        `.batch-detail[data-row="${b.dataset.more}"]`,
+        rows,
+      );
+      if (!panel) return;
 
-          ${banner(
-            "bad",
-            `<b>API unreachable.</b> ${esc(e.message)}`,
-          )}`;
+      const show = panel.hasAttribute("hidden");
 
-        btn.disabled = false;
+      panel.toggleAttribute("hidden", !show);
+      b.setAttribute("aria-expanded", String(show));
+      b.classList.toggle("open", show);
+    });
+
+    for (let i = 0; i < files.length; i += 1) {
+      if (turn !== mem.turn || mem.page !== "upload") {
+        return;
       }
 
-      return;
-    }
+      const avg = i > 0 ? (Date.now() - started) / i : 0;
+      const left = avg ? Math.round((avg * (files.length - i)) / 1000) : 0;
 
-    if (
-      turn !== mem.turn ||
-      mem.page !== "upload"
-    ) {
-      return;
+      text.textContent =
+        `Reading ${i + 1} of ${files.length}: ${files[i].name}` +
+        (left ? ` · about ${fmtLeft(left)} remaining` : "");
+
+      bar.style.width = `${Math.round((i / files.length) * 100)}%`;
+
+      const res = await ingestOne(files[i]);
+
+      if (turn !== mem.turn || mem.page !== "upload") {
+        return;
+      }
+
+      done.push(res);
+      rows.insertAdjacentHTML("beforeend", batchRow(res, i));
+
+      bar.style.width = `${Math.round(
+        ((i + 1) / files.length) * 100,
+      )}%`;
+
+      if (i < files.length - 1) {
+        await wait(GAP_MS);
+      }
     }
 
     clear();
 
-    if (r.status === 422) {
-      let why = "The document was flagged.";
+    const okCount = done.filter(
+      (r) => r.status === "auto_approved",
+    ).length;
 
-      try {
-        const d = await r.json();
+    const waitCount = done.filter(
+      (r) => r.status === "pending_review",
+    ).length;
 
-        why =
-          d?.detail?.blocked_reason ||
-          d?.detail ||
-          why;
-      } catch {
-        // Use the default message.
-      }
+    const badCount = done.length - okCount - waitCount;
 
-      out.innerHTML = `
-        <div class="ll-rule">
-          Extraction result
-        </div>
+    const spend = done.reduce(
+      (n, r) => n + (Number(r.costRaw) || 0),
+      0,
+    );
 
-        ${banner(
-          "bad",
-          `<b>Blocked.</b> ${esc(why)}`,
-        )}`;
+    text.textContent =
+      `Done. ${okCount} approved, ${waitCount} sent to review, ` +
+      `${badCount} failed or blocked. Spend ${cost(spend)}.`;
 
-      btn.disabled = false;
-      return;
-    }
+    $("#bactions", box).innerHTML = `
+      <button
+        class="btn secondary small"
+        type="button"
+        id="csv"
+      >Download CSV summary</button>
 
-    if (r.status !== 200) {
-      out.innerHTML = `
-        <div class="ll-rule">
-          Extraction result
-        </div>
+      ${
+        waitCount
+          ? `<button
+               class="btn primary small"
+               type="button"
+               data-go="review"
+             >Open review queue</button>`
+          : ""
+      }`;
 
-        ${banner(
-          "bad",
-          `<b>Error ${r.status}.</b> ${esc(
-            await msg(r),
-          )}`,
-        )}`;
-
-      btn.disabled = false;
-      return;
-    }
-
-    let d;
-
-    try {
-      d = await r.json();
-    } catch {
-      out.innerHTML = `
-        <div class="ll-rule">
-          Extraction result
-        </div>
-
-        ${banner(
-          "bad",
-          "The API returned an unreadable response.",
-        )}`;
-
-      btn.disabled = false;
-      return;
-    }
-
-    const list =
-      Array.isArray(d.flagged_fields)
-        ? d.flagged_fields
-        : [];
-
-    const top =
-      d.status === "auto_approved"
-        ? banner(
-            "ok",
-            `<b>Approved.</b> All fields passed the checks. ` +
-              `Doc <span class="mono">${esc(d.doc_id)}</span> ` +
-              `| <span class="mono">${cost(d.cost_usd)}</span>`,
-          )
-        : banner(
-            "pending",
-            `<b>${list.length} field${
-              list.length === 1 ? "" : "s"
-            } need review.</b> ` +
-              `The document is in the Review queue. ` +
-              `Doc <span class="mono">${esc(d.doc_id)}</span> ` +
-              `| <span class="mono">${cost(d.cost_usd)}</span>`,
-          );
-
-    out.innerHTML = `
-      <div class="ll-rule">
-        Extraction result
-      </div>
-
-      ${top}
-      ${grid(d.extraction || {})}
-      ${flags(list)}`;
+    $("#csv", box).addEventListener("click", () => {
+      download(
+        csvText(done),
+        `recordslens-batch-${Date.now()}.csv`,
+      );
+    });
 
     btn.disabled = false;
   }
@@ -890,8 +1125,9 @@
           class="btn secondary small"
           type="button"
           id="reload"
+          style="font-size:1rem;"
         >
-          Refresh
+          &#x27F3;
         </button>
       </div>
 
@@ -1215,16 +1451,16 @@
     }
   }
 
-  async function ledger(fresh = false) {
+  async function records(fresh = false) {
     const turn = mem.turn;
 
     box.innerHTML = `
       ${head(
-        "Ledger",
+        "Records",
         "See every processed document. Open a row to view the image and details.",
       )}
 
-      <div id="ledger-box">
+      <div id="records-box">
         <div class="loader">
           Loading documents...
         </div>
@@ -1240,9 +1476,9 @@
     } catch (e) {
       if (
         turn === mem.turn &&
-        mem.page === "ledger"
+        mem.page === "records"
       ) {
-        $("#ledger-box", box).innerHTML =
+        $("#records-box", box).innerHTML =
           banner(
             "bad",
             `<b>API unreachable.</b> ${esc(e.message)}`,
@@ -1254,18 +1490,18 @@
 
     if (
       turn !== mem.turn ||
-      mem.page !== "ledger"
+      mem.page !== "records"
     ) {
       return;
     }
 
-    showLedger(
+    showRecords(
       Array.isArray(docs) ? docs : [],
     );
   }
 
-  function showLedger(docs) {
-    const area = $("#ledger-box", box);
+  function showRecords(docs) {
+    const area = $("#records-box", box);
 
     if (!docs.length) {
       area.innerHTML =
@@ -1342,9 +1578,9 @@
         All documents
       </div>
 
-      <div class="ledger-wrap">
-        <div class="ledger">
-          <div class="ledger-head">
+      <div class="records-wrap">
+        <div class="records">
+          <div class="records-head">
             <span class="ll-col-head">
               File
             </span>
@@ -1369,7 +1605,7 @@
           </div>
 
           ${docs
-            .map((d) => ledgerRow(d))
+            .map((d) => recordsRow(d))
             .join("")}
         </div>
       </div>`;
@@ -1385,13 +1621,13 @@
               : id;
 
           save("ll-open", mem.open);
-          showLedger(docs);
+          showRecords(docs);
         });
       },
     );
   }
 
-  function ledgerRow(d) {
+  function recordsRow(d) {
     const id =
       String(d?.doc_id ?? "");
 
@@ -1412,7 +1648,7 @@
         .replace("T", " at ");
 
     return `
-      <div class="ledger-row">
+      <div class="records-row">
         <div class="ll-row-text">
           ${esc(d?.filename ?? "")}
           <br>
@@ -1449,57 +1685,54 @@
           data-do="open"
           data-id="${esc(id)}"
         >
-          ${open ? "Close" : "Open"}
+          ${open ? "Hide" : "Details"}
         </button>
       </div>
 
-      <div class="ll-ledger-line"></div>
+      <div class="ll-records-line"></div>
 
       ${open ? detail(d) : ""}`;
   }
 
   function detail(d) {
-    const id =
-      String(d?.doc_id ?? "");
+    const id = String(d?.doc_id ?? "");
+    const total = Number(d?.total);
+    const status = String(d?.status ?? "");
 
-    const total =
-      Number(d?.total);
-
-    const cards = [
+    const meta = [
+      field("Document id", id, null, false, "var(--blue)"),
       field(
-        "Vendor",
-        d?.vendor || "-",
-        null,
-        false,
-        "var(--blue)",
-      ),
-
-      field(
-        "Total",
-        Number.isFinite(total)
-          ? num(total)
-          : "-",
-        null,
-        true,
-        "var(--green)",
-      ),
-
-      field(
-        "Currency",
-        d?.currency || "-",
+        "Ingested",
+        String(d?.created_at ?? "").slice(0, 16).replace("T", " at "),
         null,
         false,
         "var(--teal)",
       ),
-
-      field(
-        "Cost",
-        cost(d?.cost_usd),
-        null,
-        true,
-        "var(--violet)",
-      ),
+      field("Status", (states[status] || ["", status])[1], null, false, "var(--amber)"),
+      field("Processing cost", cost(d?.cost_usd), null, true, "var(--violet)"),
     ].join("");
+
+    let why = "";
+
+    if (d?.blocked_reason) {
+      why = banner(
+        "bad",
+        `<b>${
+          status === "rejected"
+            ? "Rejection note"
+            : "Blocked by the moderation gate"
+        }.</b> ${esc(d.blocked_reason)}`,
+      );
+    }
+
+    const body = d?.extraction
+      ? `
+        <div class="ll-rule">Extracted record</div>
+        ${grid(d.extraction)}`
+      : banner(
+          "pending",
+          "No extracted record is stored for this document.",
+        );
 
     return `
       <div class="detail">
@@ -1507,32 +1740,42 @@
           <div>
             <img
               class="ll-doc-img"
-              src="${esc(
-                join(
-                  `/image/${encodeURIComponent(id)}`,
-                ),
-              )}"
+              src="${esc(join(`/image/${encodeURIComponent(id)}`))}"
               alt="Processed document ${esc(id)}"
             >
 
             <p class="caption">
-              The document id and UTC time are shown
-              in the lower right.
+              The document id and UTC time are shown in the lower right.
             </p>
           </div>
 
           <div>
-            <div
-              class="ll-field-grid ll-field-grid-single"
-            >
-              ${cards}
+            <div class="ll-field-grid ll-field-grid-single">
+              ${meta}
             </div>
 
-            ${chip(d?.status)}
+            <div class="ll-row-text">
+              ${esc(d?.filename ?? "")}
+            </div>
           </div>
         </div>
+
+        ${why}
+        ${body}
       </div>`;
   }
+
+  function fmtLeft(sec) {
+    if (sec < 60) {
+      return `${sec}s`;
+    }
+
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+
+    return s ? `${m}m ${s}s` : `${m}m`;
+  }
+
 
   document.addEventListener("click", (e) => {
     const nav =
@@ -1564,9 +1807,7 @@
   window.addEventListener(
     "beforeunload",
     () => {
-      if (mem.url) {
-        URL.revokeObjectURL(mem.url);
-      }
+      mem.urls.forEach((u) => URL.revokeObjectURL(u));
     },
   );
 

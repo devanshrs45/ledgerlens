@@ -1239,3 +1239,36 @@ html[data-theme="dark"] .ll-summary-item:nth-child(5) {
     transition: none !important;
   }
 }
+.ll-flag-info {
+  min-width: 0;
+}
+
+.ll-flag-meta {
+  margin-top: 0.4rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.ll-flag-reason {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e7cf6e;
+  border-radius: 7px;
+  background: #fff3c4;
+  color: #5f4900;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.ll-flag-reason strong {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+html[data-theme="dark"] .ll-flag-reason {
+  border-color: #6d5d2e;
+  background: #40371e;
+  color: #f0d979;
+}

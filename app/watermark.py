@@ -18,7 +18,7 @@ def add_visible_watermark(image_bytes: bytes, doc_id: str) -> bytes:
 
     #Gets the image dimensions 
     width, height = image.size
-    font_size = max(width // 22, 24)    #sets font size based on width
+    font_size = min(max(min(width, height) // 22, 24), 36)    #sets font size based on width
 
     #selects font style, loads default when error/DejaVuSans not available
     try:

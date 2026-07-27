@@ -19,15 +19,29 @@ import json
 
 #instruction block sent to the vision model 
 EXTRACTION_PROMPT = (
-    "You are an expert document-intelligence system. Extract the structured data from this receipt or invoice image.\n\n"
-    "Rules:\n"
-    "- Fill every field of the schema. Use empty string / 0 when a field is genuinely absent from the document, with a LOW confidence score.\n"
-    "- The Dates must be ISO format YYYY-MM-DD.\n"
-    "- Currency must be an ISO 4217 code (infer from symbols: ₹->INR, $->USD, €->EUR, £->GBP).\n"
-    "- Confidence reflects how certain you are of THAT specific value given image quality, ambiguity, and legibility. Be honest: blurry or partially blocked values must score low. Never invent a line item. If you are unsure a line exists, include it with confidence below 0.6 rather than guessing confidently.\n"
-    "- If this image is NOT a receipt or invoice, set every field to empty/0 with confidence 0.0 and overall_confidence 0.0.\n"
-    "- Additional_charges is the SUM of every charge beyond subtotal and tax: shipping, delivery, tips, service charges, bottle deposits, environment fees, surcharges. Discount is the SUM of every deduction. Use 0 only when genuinely absent and not there.\n"
-    "- The document must tally: subtotal + tax + additional_charges - discount = total. If your values do not satisfy this, re-read the document before answering.\n"
+    "You are an expert document-intelligence system. Extract structured data from this receipt or invoice image.\n\n"
+
+    "Evidence rules:\n"
+    "- Only return a value when it is explicitly visible and supported by a printed label.\n"
+    "- Never invent or calculate a subtotal, tax, discount, date, invoice number, or charge merely to make the arithmetic balance.\n"
+    "- If a value is unclear, obscured, rotated, or not explicitly labelled, return 0 or an empty string with confidence below 0.60.\n"
+    "- Confidence measures visible evidence, not whether the result seems plausible.\n"
+    "- Do not assign confidence above 0.85 unless both the label and complete value are clearly readable.\n\n"
+
+    "Field rules:\n"
+    "- Date must come from a field explicitly labelled Invoice Date, Bill Date, Receipt Date, or Date. Do not use service date, sold date, due date, RO date, payment date, manufacturing date, or watermark date.\n"
+    "- Currency must be an ISO 4217 code.\n"
+    "- Subtotal must come from a printed Subtotal, Net Amount, Taxable Amount, or equivalent field. Do not derive it from total minus tax.\n"
+    "- Tax must be the sum of all explicitly printed tax components such as CGST, SGST, IGST, VAT, or GST.\n"
+    "- Discount must be nonzero only when an explicit discount, coupon, rebate, saving, credit, or deduction is printed.\n"
+    "- Additional charges must include only explicitly printed fees or charges.\n"
+    "- Total must come from the printed Grand Total, Amount Payable, or Total field.\n"
+    "- Preserve printed decimal values. Do not replace an exact total with a rounded value unless the document explicitly labels it Rounded Total.\n\n"
+
+    "Validation rules:\n"
+    "- Verify subtotal + tax + additional_charges - discount equals total.\n"
+    "- If the printed fields do not tally, preserve the printed values and lower overall_confidence. Do not alter one value to force the arithmetic to match.\n"
+    "- If this is not a receipt or invoice, return empty or zero values with confidence 0.0.\n"
 )
 
 #format of one extraction output
@@ -119,6 +133,21 @@ def route_by_confidence(invoice: InvoiceSchema, threshold: float | None = None) 
     #sets threshold (if none) and empty list of flagged fields
     threshold = settings.REVIEW_THRESHOLD if threshold is None else threshold
     flagged: List[FlaggedField] = []
+
+    #checks overall confidence
+    if invoice.overall_confidence < threshold:
+        flagged.append(
+            FlaggedField(
+                field_path="overall_confidence",
+                value=str(invoice.overall_confidence),
+                confidence=invoice.overall_confidence,
+                reason=(
+                    f"Overall extraction confidence "
+                    f"({invoice.overall_confidence:.2f}) is below "
+                    f"the {threshold:.2f} review threshold."
+                ),
+            )
+        )
 
     #iterates through scalar fields and checks confidence
     for name in SCALAR_FIELDS:

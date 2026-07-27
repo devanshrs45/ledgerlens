@@ -9,10 +9,23 @@ const api = $("meta[name='api-base']")?.content.replace(/\/$/, "") || "";
 // const api = ($("meta[name='api-base']")?.content || "http://localhost:8000").replace(/\/$/, "");
 
 const pages = ["home", "upload", "review", "records"];
-const moneyFields = ["subtotal", "tax", "discount", "additional_charges", "total"];
+const moneyFields = [
+  "subtotal",
+  "tax",
+  "discount",
+  "additional_charges",
+  "total",
+];
 const fields = [
-  "vendor", "invoice_number", "date", "currency",
-  "subtotal", "tax", "discount", "additional_charges", "total",
+  "vendor",
+  "invoice_number",
+  "date",
+  "currency",
+  "subtotal",
+  "tax",
+  "discount",
+  "additional_charges",
+  "total",
 ];
 const statusNames = {
   auto_approved: ["ok", "Auto Approved"],
@@ -98,22 +111,42 @@ function wait(ms) {
 }
 
 function csvText(rows) {
-  const all = [[
-    "filename", "doc_id", "status", "vendor",
-    "total", "currency", "held_fields", "cost_usd",
-  ]];
+  const all = [
+    [
+      "filename",
+      "doc_id",
+      "status",
+      "vendor",
+      "total",
+      "currency",
+      "held_fields",
+      "cost_usd",
+    ],
+  ];
 
   rows.forEach((row) => {
     all.push([
-      row.name, row.doc_id, row.status, row.vendor,
-      row.totalRaw, row.currency, row.flagged, row.costRaw,
+      row.name,
+      row.doc_id,
+      row.status,
+      row.vendor,
+      row.totalRaw,
+      row.currency,
+      row.flagged,
+      row.costRaw,
     ]);
   });
 
-  return all.map((row) => row.map((cell) => {
-    const text = String(cell ?? "");
-    return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-  }).join(",")).join("\n");
+  return all
+    .map((row) =>
+      row
+        .map((cell) => {
+          const text = String(cell ?? "");
+          return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+        })
+        .join(","),
+    )
+    .join("\n");
 }
 
 function download(text, name) {
@@ -272,28 +305,34 @@ function field(label, value, confidence = null, money = false) {
 }
 
 function grid(data = {}) {
-  const cards = fields.map((name, i) => {
-    const item = data[name] || { value: null, confidence: 0 };
-    return field(
-      title(name),
-      item?.value,
-      item?.confidence,
-      moneyFields.includes(name),
-    );
-  }).join("");
+  const cards = fields
+    .map((name, i) => {
+      const item = data[name] || { value: null, confidence: 0 };
+      return field(
+        title(name),
+        item?.value,
+        item?.confidence,
+        moneyFields.includes(name),
+      );
+    })
+    .join("");
 
   const items = Array.isArray(data.line_items) ? data.line_items : [];
   let table = "";
 
   if (items.length) {
-    const rows = items.map((item) => `
+    const rows = items
+      .map(
+        (item) => `
       <tr>
         <td>${esc(item?.description ?? "")}</td>
         <td class="num">${num(item?.quantity, 0)}</td>
         <td class="num">${num(item?.unit_price)}</td>
         <td class="num money">${num(item?.amount)}</td>
         <td class="num">${pill(item?.confidence)}</td>
-      </tr>`).join("");
+      </tr>`,
+      )
+      .join("");
 
     table = `
       <div class="ll-rule">Line items</div>
@@ -319,13 +358,17 @@ function grid(data = {}) {
 function flags(list = []) {
   if (!Array.isArray(list) || !list.length) return "";
 
-  const rows = list.map((item) => `
+  const rows = list
+    .map(
+      (item) => `
     <tr>
       <td>${esc(item?.field_path ?? "")}</td>
       <td class="num">${esc(item?.value ?? "")}</td>
       <td class="num">${pill(item?.confidence)}</td>
       <td>${esc(item.reason)}</td>
-    </tr>`).join("");
+    </tr>`,
+    )
+    .join("");
 
   return `
     <div class="ll-rule">Held for review</div>
@@ -360,8 +403,8 @@ async function home() {
     $("[data-x='ok']", main).textContent = docs.filter((item) =>
       ["auto_approved", "approved"].includes(item?.status),
     ).length;
-    $("[data-x='wait']", main).textContent = docs.filter((item) =>
-      item?.status === "pending_review",
+    $("[data-x='wait']", main).textContent = docs.filter(
+      (item) => item?.status === "pending_review",
     ).length;
   } catch {}
 }
@@ -379,11 +422,12 @@ function upload() {
 
   if (files.length) {
     const kb = files.reduce((total, file) => total + file.size, 0) / 1024;
-    const thumbs = files.map((file, i) => {
-      const url = URL.createObjectURL(file);
-      app.urls.push(url);
+    const thumbs = files
+      .map((file, i) => {
+        const url = URL.createObjectURL(file);
+        app.urls.push(url);
 
-      return `
+        return `
         <figure class="batch-thumb">
           <img src="${esc(url)}" alt="${esc(file.name)}">
           <button
@@ -394,7 +438,8 @@ function upload() {
           >x</button>
           <figcaption>${esc(file.name)}</figcaption>
         </figure>`;
-    }).join("");
+      })
+      .join("");
 
     $("#preview", main).innerHTML = `
       <div class="preview-card">
@@ -446,9 +491,10 @@ function pick(list) {
   const files = [...(list || [])];
   if (!files.length) return;
 
-  const good = files.filter((file) =>
-    ["image/jpeg", "image/png"].includes(file.type) ||
-    /\.(jpe?g|png)$/i.test(file.name),
+  const good = files.filter(
+    (file) =>
+      ["image/jpeg", "image/png"].includes(file.type) ||
+      /\.(jpe?g|png)$/i.test(file.name),
   );
 
   if (!good.length) {
@@ -515,7 +561,8 @@ async function ingestOne(file, attempt = 0) {
     try {
       const data = await res.json();
       out.doc_id = String(data?.detail?.doc_id ?? "");
-      out.detail = data?.detail?.blocked_reason || "Blocked by the moderation gate.";
+      out.detail =
+        data?.detail?.blocked_reason || "Blocked by the moderation gate.";
     } catch {
       out.detail = "Blocked by the moderation gate.";
     }
@@ -546,7 +593,9 @@ async function ingestOne(file, attempt = 0) {
   out.currency = String(extraction?.currency?.value ?? "");
   out.totalRaw = Number.isFinite(total) ? total : "";
   out.total = Number.isFinite(total) ? num(total) : "-";
-  out.flagged = Array.isArray(data.flagged_fields) ? data.flagged_fields.length : 0;
+  out.flagged = Array.isArray(data.flagged_fields)
+    ? data.flagged_fields.length
+    : 0;
   out.costRaw = Number(data.cost_usd) || 0;
   out.extraction = extraction;
   out.held = Array.isArray(data.flagged_fields) ? data.flagged_fields : [];
@@ -557,7 +606,8 @@ async function ingestOne(file, attempt = 0) {
 
 function batchRow(row, i) {
   const canOpen = Boolean(row.extraction) || Boolean(row.detail);
-  const image = row.img ? `
+  const image = row.img
+    ? `
     <img
       class="ll-doc-img"
       src="${esc(join(row.img))}"
@@ -565,13 +615,16 @@ function batchRow(row, i) {
     >
     <p class="caption">
       The document id and UTC time are shown in the lower right.
-    </p>` : "";
+    </p>`
+    : "";
 
-  const detail = row.extraction ? `
+  const detail = row.extraction
+    ? `
     <div class="batch-detail-grid">
       <div>${image}</div>
       <div>${grid(row.extraction)}${flags(row.held)}</div>
-    </div>` : banner("bad", esc(row.detail || "No details available."));
+    </div>`
+    : banner("bad", esc(row.detail || "No details available."));
 
   return `
     <tr>
@@ -585,14 +638,18 @@ function batchRow(row, i) {
       <td class="num">${row.flagged || "-"}</td>
       <td class="num">${cost(row.costRaw)}</td>
       <td class="num">
-        ${canOpen ? `
+        ${
+          canOpen
+            ? `
           <button
             class="batch-more"
             type="button"
             data-more="${i}"
             aria-expanded="false"
             aria-label="Show details for ${esc(row.name)}"
-          >&#9656;</button>` : ""}
+          >&#9656;</button>`
+            : ""
+        }
       </td>
     </tr>
     <tr class="batch-detail" data-row="${i}" hidden>
@@ -636,7 +693,9 @@ async function ingest() {
     if (!same("upload", turn)) return;
 
     const average = i ? (Date.now() - started) / i : 0;
-    const left = average ? Math.round((average * (files.length - i)) / 1000) : 0;
+    const left = average
+      ? Math.round((average * (files.length - i)) / 1000)
+      : 0;
 
     text.textContent =
       `Reading ${i + 1} of ${files.length}: ${files[i].name}` +
@@ -656,9 +715,14 @@ async function ingest() {
   clearCache();
 
   const approved = done.filter((row) => row.status === "auto_approved").length;
-  const reviewCount = done.filter((row) => row.status === "pending_review").length;
+  const reviewCount = done.filter(
+    (row) => row.status === "pending_review",
+  ).length;
   const failed = done.length - approved - reviewCount;
-  const spend = done.reduce((total, row) => total + (Number(row.costRaw) || 0), 0);
+  const spend = done.reduce(
+    (total, row) => total + (Number(row.costRaw) || 0),
+    0,
+  );
 
   text.textContent =
     `Done. ${approved} approved, ${reviewCount} sent to review, ` +
@@ -684,10 +748,14 @@ async function ingest() {
     <button class="btn secondary small" type="button" id="csv">
       Download CSV summary
     </button>
-    ${reviewCount ? `
+    ${
+      reviewCount
+        ? `
       <button class="btn primary small" type="button" data-go="review">
         Open review queue
-      </button>` : ""}`;
+      </button>`
+        : ""
+    }`;
 
   $("#csv", main).addEventListener("click", () => {
     download(csvText(done), `recordslens-batch-${Date.now()}.csv`);
@@ -749,17 +817,32 @@ function reviewItem(item, open) {
   const id = String(item?.doc_id ?? "");
   const held = Array.isArray(item?.flagged_fields) ? item.flagged_fields : [];
 
-  const rows = held.map((field, i) => {
-    const path = String(field?.field_path ?? "");
-    const value = String(field?.value ?? "");
+  const rows = held
+    .map((field, i) => {
+      const path = String(field?.field_path ?? "");
+      const value = String(field?.value ?? "");
+      const reason = String(
+        field?.reason ?? "This field requires manual review.",
+      );
 
-    return `
+      return `
       <div class="correction-row">
-        <div>
-          <div class="ll-correction-label">${esc(path)}</div>
-          <div class="ll-correction-value">${esc(value)}</div>
-          <div class="ll-correction-help">Confidence ${pill(field?.confidence)}</div>
-        </div>
+        <div class="ll-flag-info">
+			<div class="ll-correction-label">${esc(title(path))}</div>
+
+			<div class="ll-correction-value">
+				${esc(value || "No value extracted")}
+			</div>
+
+			<div class="ll-flag-meta">
+				<span>Confidence ${pill(field?.confidence)}</span>
+			</div>
+
+			<div class="ll-flag-reason">
+				<strong>Why it was flagged</strong>
+				<span>${esc(reason)}</span>
+			</div>
+		</div>
 
         <div>
           <label class="ll-correction-label" for="fix-${esc(id)}-${i}">
@@ -774,7 +857,8 @@ function reviewItem(item, open) {
           >
         </div>
       </div>`;
-  }).join("");
+    })
+    .join("");
 
   return `
     <details class="review-item" data-id="${esc(id)}" ${open ? "open" : ""}>
@@ -796,7 +880,7 @@ function reviewItem(item, open) {
           <div>${grid(item?.extraction || {})}</div>
         </div>
 
-        <div class="ll-rule">Correct the held fields</div>
+        <div class="ll-rule">Fields requiring review</div>
         ${rows}
 
         <div class="form-row">
@@ -836,7 +920,8 @@ async function rejectOne(btn, list) {
   if (!box || !item) return;
 
   lock(box, true);
-  const reason = $("[data-reason]", box)?.value || "Not a valid receipt/invoice";
+  const reason =
+    $("[data-reason]", box)?.value || "Not a valid receipt/invoice";
 
   try {
     await send("/reject", { doc_id: item.doc_id, reason });
@@ -912,9 +997,16 @@ function showRecords(docs) {
 
   const auto = docs.filter((item) => item?.status === "auto_approved").length;
   const approved = docs.filter((item) => item?.status === "approved").length;
-  const reviewCount = docs.filter((item) => item?.status === "pending_review").length;
-  const bad = docs.filter((item) => ["rejected", "blocked"].includes(item?.status)).length;
-  const total = docs.reduce((sum, item) => sum + (Number(item?.cost_usd) || 0), 0);
+  const reviewCount = docs.filter(
+    (item) => item?.status === "pending_review",
+  ).length;
+  const bad = docs.filter((item) =>
+    ["rejected", "blocked"].includes(item?.status),
+  ).length;
+  const total = docs.reduce(
+    (sum, item) => sum + (Number(item?.cost_usd) || 0),
+    0,
+  );
 
   $("[data-total='auto']", area).textContent = auto;
   $("[data-total='approved']", area).textContent = approved;
@@ -947,7 +1039,9 @@ function recordsRow(item) {
   const shown = Number.isFinite(total)
     ? `${currency ? currency + " " : ""}${num(total)}`
     : "-";
-  const time = String(item?.created_at ?? "").slice(0, 16).replace("T", " at ");
+  const time = String(item?.created_at ?? "")
+    .slice(0, 16)
+    .replace("T", " at ");
 
   return `
     <div class="records-row">
@@ -978,7 +1072,9 @@ function recordsRow(item) {
 function recordDetail(item) {
   const id = String(item?.doc_id ?? "");
   const status = String(item?.status ?? "");
-  const time = String(item?.created_at ?? "").slice(0, 16).replace("T", " at ");
+  const time = String(item?.created_at ?? "")
+    .slice(0, 16)
+    .replace("T", " at ");
 
   const info = [
     field("Document id", id),
@@ -990,9 +1086,10 @@ function recordDetail(item) {
   let reason = "";
 
   if (item?.blocked_reason) {
-    const label = status === "rejected"
-      ? "Rejection note"
-      : "Blocked by the moderation gate";
+    const label =
+      status === "rejected"
+        ? "Rejection note"
+        : "Blocked by the moderation gate";
 
     reason = banner("bad", `<b>${label}.</b> ${esc(item.blocked_reason)}`);
   }

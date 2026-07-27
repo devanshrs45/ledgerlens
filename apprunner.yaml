@@ -12,10 +12,10 @@ run:
     - name: OPENAI_BASE_URL
       value: "https://api.groq.com/openai/v1"
     - name: VISION_MODEL
-      value: "meta-llama/llama-4-scout-17b-16e-instruct"
-    - name: MODERATION_ENABLED
+      value: "qwen/qwen3.6-27b"
+    - name: MODERATION_SET
       value: "false"
-    - name: STRUCTURED_OUTPUT_MODE
+    - name: OUTPUT_FORMAT
       value: "json"
     - name: STORAGE_BACKEND
       value: "s3"

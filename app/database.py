@@ -1,9 +1,21 @@
+'''
+database.py -> Persistence layer:
+- For AWS/Local storage
+- Rewrites URL from RDS
+- Document and Review Table format
+- Creates blank table initially
+- Creates new session for each request
+'''
+
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, Float, ForeignKey, LargeBinary, String, Text, create_engine
+from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Text, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.config import settings
 
-_db_url = settings.DATABASE_URL
+
+_db_url = settings.DATABASE_URL     #db url
+
+#rewriting url from RDS to recognisable format by SQLAlchemy
 if _db_url.startswith("postgres://"):
     _db_url = _db_url.replace("postgres://", "postgresql+psycopg://", 1)
 elif _db_url.startswith("postgresql://"):
@@ -13,11 +25,11 @@ engine = create_engine(_db_url, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-
+#hekper function to get utc time
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
-
+#Main record
 class Document(Base):
     __tablename__ = "documents"
     id = Column(String, primary_key=True)
@@ -30,7 +42,7 @@ class Document(Base):
     cost_usd = Column(Float, default=0.0)
     created_at = Column(DateTime, default=utcnow)
 
-
+#one row of flagged fields
 class ReviewQueueItem(Base):
     __tablename__ = "review_queue"
     id = Column(String, primary_key=True)
@@ -41,18 +53,14 @@ class ReviewQueueItem(Base):
     status = Column(String, nullable=False, default="pending") # pending | corrected | approved
     corrected_value = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)
+    reason = Column(Text, nullable=True)
 
 
-class ImageBlob(Base):
-    __tablename__ = "image_blobs"
-    key = Column(String, primary_key=True) # "{doc_id}/{filename}"
-    data = Column(LargeBinary, nullable=False)
-    created_at = Column(DateTime, default=utcnow)
-
-
+#creates all empty tables
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
 
+#new session for each request
 def get_db():
     db = SessionLocal()
     try:

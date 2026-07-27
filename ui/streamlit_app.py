@@ -1,16 +1,17 @@
-"""LedgerLens Streamlit interface for receipt and invoice processing."""
+#THIS FILE IS UNUSED. USING HTML/CSS/JS INSTEAD OF STREAMLIT UI. 
+
+'''
 
 import html as html_lib
 import os
-
 import pandas as pd
 import requests
 import streamlit as st
 
-API = os.getenv("API_BASE_URL", "http://localhost:8000")
+#API = os.getenv("API_BASE_URL", "http://localhost:8000")   Not using streamlit anymore
 
 st.set_page_config(
-    page_title="LedgerLens - receipts and invoices",
+    page_title="OnRecord - receipts and invoices",
     page_icon="🧾",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -623,7 +624,7 @@ with st.container(key="topnav"):
     with brand_col:
         st.markdown(
             '<div class="ll-wordmark"><span class="ll-mark">LL</span>'
-            '<span class="ll-brand-text">LedgerLens</span></div>',
+            '<span class="ll-brand-text">OnRecord</span></div>',
             unsafe_allow_html=True,
         )
     with nav_col:
@@ -1113,3 +1114,5 @@ def page_ledger():
 # --------------------------------------------------------------------------- #
 {"home": page_home, "upload": page_upload,
  "review": page_review, "ledger": page_ledger}[st.session_state.page]()
+
+'''

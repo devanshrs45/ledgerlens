@@ -487,6 +487,7 @@
             <td>${esc(f?.field_path ?? "")}</td>
             <td class="num">${esc(f?.value ?? "")}</td>
             <td class="num">${pill(f?.confidence)}</td>
+            <td>${esc(f.reason)}</td>
           </tr>`,
       )
       .join("");
@@ -501,6 +502,7 @@
               <th>Field</th>
               <th>Extracted value</th>
               <th>Confidence</th>
+              <th>Reason</th>
             </tr>
           </thead>
 

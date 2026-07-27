@@ -5,7 +5,8 @@ const main = $("#main");
 const toastBox = $("#toast");
 const themeBtn = $("#theme");
 const themeMeta = $("meta[name='theme-color']");
-const api = ($("meta[name='api-base']")?.content || "http://localhost:8000").replace(/\/$/, "");
+const api = $("meta[name='api-base']")?.content.replace(/\/$/, "") || "";
+// const api = ($("meta[name='api-base']")?.content || "http://localhost:8000").replace(/\/$/, "");
 
 const pages = ["home", "upload", "review", "records"];
 const moneyFields = ["subtotal", "tax", "discount", "additional_charges", "total"];

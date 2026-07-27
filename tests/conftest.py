@@ -16,7 +16,6 @@ os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 @pytest.fixture()
 def settings():
-    """Return the live settings object (re-imported fresh)."""
     from app import config
     importlib.reload(config)
     return config.settings
@@ -24,7 +23,6 @@ def settings():
 
 @pytest.fixture()
 def tiny_png_bytes():
-    """A minimal valid 4x4 PNG, as bytes, built with Pillow."""
     from PIL import Image
     buf = io.BytesIO()
     Image.new("RGB", (4, 4), (200, 180, 160)).save(buf, format="PNG")
@@ -33,7 +31,6 @@ def tiny_png_bytes():
 
 @pytest.fixture()
 def big_png_bytes():
-    """A 3000x2000 PNG, larger than IMAGE_DIM, to test resizing."""
     from PIL import Image
     buf = io.BytesIO()
     Image.new("RGB", (3000, 2000), (120, 120, 120)).save(buf, format="PNG")
@@ -41,17 +38,11 @@ def big_png_bytes():
 
 
 def make_confident(value, confidence):
-    """Build a {'value', 'confidence'} dict as the model would return."""
     return {"value": value, "confidence": confidence}
 
 
 @pytest.fixture()
 def valid_invoice_dict():
-    """
-    A factory returning a dict that validates against InvoiceSchema.
-    Call it with overrides, e.g. valid_invoice_dict(total_conf=0.4).
-    Arithmetic reconciles: subtotal 100 + tax 10 + charges 0 - discount 0 = 110.
-    """
     def _make(**over):
         base = {
             "vendor": make_confident(over.get("vendor", "Corner Shop"),
@@ -84,10 +75,6 @@ def valid_invoice_dict():
 
 @pytest.fixture()
 def db_session():
-    """
-    A fresh in-memory database with all tables created, yielded as a session.
-    Uses a StaticPool so the same in-memory DB is shared across the connection.
-    """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.pool import StaticPool

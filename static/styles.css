@@ -592,7 +592,6 @@ html[data-theme="dark"] .dropzone.drag {
 .ll-status {
   padding: 0.25rem 0.5rem;
   font-size: 0.8rem;
-  margin-top: 11.7px;
 }
 .ll-pill.hi,
 .ll-status.ok {
@@ -697,7 +696,7 @@ html[data-theme="dark"] .ll-banner.bad {
 }
 .ll-table td {
   padding: 0.7rem;
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line); 
 }
 .ll-table tbody tr:hover {
   background: var(--soft);
@@ -750,6 +749,22 @@ html[data-theme="dark"] .ll-banner.bad {
   gap: 1rem;
   padding: 0.8rem 0;
   border-bottom: 1px solid var(--line);
+}
+.other-fields {
+  margin-top: 0.6rem;
+}
+.other-fields summary {
+  padding: 0.6rem 15px;
+  color: var(--text2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 20px;
+  margin-top: 20px;
+}
+.other-fields summary:hover {
+  color: var(--line);
+  transform: scale(1.005);
 }
 .ll-correction-label {
   color: var(--muted);

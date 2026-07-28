@@ -6,7 +6,9 @@ const toastBox = $("#toast");
 const themeBtn = $("#theme");
 const themeMeta = $("meta[name='theme-color']");
 const api = $("meta[name='api-base']")?.content.replace(/\/$/, "") || "";
-// const api = ($("meta[name='api-base']")?.content || "http://localhost:8000").replace(/\/$/, "");
+// const api = (
+// $("meta[name='api-base']")?.content || "http://localhost:8000"
+// ).replace(/\/$/, "");
 
 const pages = ["home", "upload", "review", "records"];
 const moneyFields = [
@@ -85,6 +87,13 @@ function title(value) {
   return String(value)
     .replaceAll("_", " ")
     .replace(/\b\w/g, (x) => x.toUpperCase());
+}
+
+function fieldLabel(p) {
+  const s = String(p ?? "");
+  const m = s.match(/^line_items\[(\d+)\]$/);
+  if (m) return `Line Item ${Number(m[1]) + 1}`;
+  return title(s);
 }
 
 function num(value, digits = 2) {
@@ -293,15 +302,15 @@ function field(label, value, confidence = null, money = false) {
   const moneyClass = money && shown !== "-" ? " money" : "";
   const score = confidence == null ? "" : pill(confidence);
   return `
-    <div class="ll-field">
-      <div class="ll-field-label">
-        <span>${esc(label)}</span>
-        ${score}
-      </div>
-      <div class="ll-field-value${moneyClass}" title="${shown}">
-        ${shown}
-      </div>
-    </div>`;
+			<div class="ll-field">
+			<div class="ll-field-label">
+				<span>${esc(label)}</span>
+				${score}
+			</div>
+			<div class="ll-field-value${moneyClass}" title="${shown}">
+				${shown}
+			</div>
+			</div>`;
 }
 
 function grid(data = {}) {
@@ -324,32 +333,32 @@ function grid(data = {}) {
     const rows = items
       .map(
         (item) => `
-      <tr>
-        <td>${esc(item?.description ?? "")}</td>
-        <td class="num">${num(item?.quantity, 0)}</td>
-        <td class="num">${num(item?.unit_price)}</td>
-        <td class="num money">${num(item?.amount)}</td>
-        <td class="num">${pill(item?.confidence)}</td>
-      </tr>`,
+			<tr>
+				<td>${esc(item?.description ?? "")}</td>
+				<td class="num">${num(item?.quantity, 0)}</td>
+				<td class="num">${num(item?.unit_price)}</td>
+				<td class="num money">${num(item?.amount)}</td>
+				<td class="num">${pill(item?.confidence)}</td>
+			</tr>`,
       )
       .join("");
 
     table = `
-      <div class="ll-rule">Line items</div>
-      <div class="ll-table-wrap">
-        <table class="ll-table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th>Qty</th>
-              <th>Unit price</th>
-              <th>Amount</th>
-              <th>Confidence</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
+			<div class="ll-rule">Line items</div>
+			<div class="ll-table-wrap">
+				<table class="ll-table">
+				<thead>
+					<tr>
+					<th>Description</th>
+					<th>Qty</th>
+					<th>Unit price</th>
+					<th>Amount</th>
+					<th>Confidence</th>
+					</tr>
+				</thead>
+				<tbody>${rows}</tbody>
+				</table>
+			</div>`;
   }
 
   return `<div class="ll-field-grid">${cards}</div>${table}`;
@@ -361,30 +370,30 @@ function flags(list = []) {
   const rows = list
     .map(
       (item) => `
-    <tr>
-      <td>${esc(item?.field_path ?? "")}</td>
-      <td class="num">${esc(item?.value ?? "")}</td>
-      <td class="num">${pill(item?.confidence)}</td>
-      <td>${esc(item.reason)}</td>
-    </tr>`,
+			<tr>
+			<td>${esc(fieldLabel(item?.field_path ?? ""))}</td>
+			<td class="num" style="text-align: center;">${esc(item?.value ?? "")}</td>
+			<td class="num" style="text-align: center;">${pill(item?.confidence)}</td>
+			<td>${esc(item.reason)}</td>
+			</tr>`,
     )
     .join("");
 
   return `
-    <div class="ll-rule">Held for review</div>
-    <div class="ll-table-wrap">
-      <table class="ll-table">
-        <thead>
-          <tr>
-            <th>Field</th>
-            <th>Extracted value</th>
-            <th>Confidence</th>
-            <th>Reason</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+			<div class="ll-rule">Held for review</div>
+			<div class="ll-table-wrap">
+			<table class="ll-table">
+				<thead>
+				<tr>
+					<th>Field</th>
+					<th>Extracted value</th>
+					<th>Confidence</th>
+					<th style="width: 40%;">Reason</th>
+				</tr>
+				</thead>
+				<tbody>${rows}</tbody>
+			</table>
+			</div>`;
 }
 
 function banner(type, html) {
@@ -428,27 +437,27 @@ function upload() {
         app.urls.push(url);
 
         return `
-        <figure class="batch-thumb">
-          <img src="${esc(url)}" alt="${esc(file.name)}">
-          <button
-            class="batch-drop"
-            type="button"
-            data-drop="${i}"
-            aria-label="Remove ${esc(file.name)}"
-          >x</button>
-          <figcaption>${esc(file.name)}</figcaption>
-        </figure>`;
+				<figure class="batch-thumb">
+				<img src="${esc(url)}" alt="${esc(file.name)}">
+				<button
+					class="batch-drop"
+					type="button"
+					data-drop="${i}"
+					aria-label="Remove ${esc(file.name)}"
+				>x</button>
+				<figcaption>${esc(file.name)}</figcaption>
+				</figure>`;
       })
       .join("");
 
     $("#preview", main).innerHTML = `
-      <div class="preview-card">
-        <div class="batch-strip">${thumbs}</div>
-        <div class="ll-file-meta">
-          <span>${files.length} file${plural(files.length)} ready</span>
-          <span>${Math.round(kb).toLocaleString()} KB total</span>
-        </div>
-      </div>`;
+			<div class="preview-card">
+				<div class="batch-strip">${thumbs}</div>
+				<div class="ll-file-meta">
+				<span>${files.length} file${plural(files.length)} ready</span>
+				<span>${Math.round(kb).toLocaleString()} KB total</span>
+				</div>
+			</div>`;
 
     run.disabled = false;
     run.textContent = `Extract ${files.length} document${plural(files.length)}`;
@@ -608,55 +617,55 @@ function batchRow(row, i) {
   const canOpen = Boolean(row.extraction) || Boolean(row.detail);
   const image = row.img
     ? `
-    <img
-      class="ll-doc-img"
-      src="${esc(join(row.img))}"
-      alt="Processed document ${esc(row.doc_id)}"
-    >
-    <p class="caption">
-      The document id and UTC time are shown in the lower right.
-    </p>`
+			<img
+			class="ll-doc-img"
+			src="${esc(join(row.img))}"
+			alt="Processed document ${esc(row.doc_id)}"
+			>
+			<p class="caption">
+			The document id and UTC time are shown in the lower right.
+			</p>`
     : "";
 
   const detail = row.extraction
     ? `
-    <div class="batch-detail-grid">
-      <div>${image}</div>
-      <div>${grid(row.extraction)}${flags(row.held)}</div>
-    </div>`
+			<div class="batch-detail-grid">
+			<div>${image}</div>
+			<div>${grid(row.extraction)}${flags(row.held)}</div>
+			</div>`
     : banner("bad", esc(row.detail || "No details available."));
 
   return `
-    <tr>
-      <td>
-        ${esc(row.name)}
-        ${row.doc_id ? `<br><span class="batch-why">${esc(row.doc_id)}</span>` : ""}
-      </td>
-      <td>${chip(row.status)}</td>
-      <td>${esc(row.vendor || "-")}</td>
-      <td class="num money">${esc(row.total)}</td>
-      <td class="num">${row.flagged || "-"}</td>
-      <td class="num">${cost(row.costRaw)}</td>
-      <td class="num">
-        ${
+			<tr>
+			<td>
+				${esc(row.name)}
+				${row.doc_id ? `<br><span class="batch-why">${esc(row.doc_id)}</span>` : ""}
+			</td>
+			<td>${chip(row.status)}</td>
+			<td>${esc(row.vendor || "-")}</td>
+			<td class="num money">${esc(row.total)}</td>
+			<td class="num">${row.flagged || "-"}</td>
+			<td class="num">${cost(row.costRaw)}</td>
+			<td class="num">
+				${
           canOpen
             ? `
-          <button
-            class="batch-more"
-            type="button"
-            data-more="${i}"
-            aria-expanded="false"
-            aria-label="Show details for ${esc(row.name)}"
-          >&#9656;</button>`
+				<button
+					class="batch-more"
+					type="button"
+					data-more="${i}"
+					aria-expanded="false"
+					aria-label="Show details for ${esc(row.name)}"
+				>&#9656;</button>`
             : ""
         }
-      </td>
-    </tr>
-    <tr class="batch-detail" data-row="${i}" hidden>
-      <td colspan="7">
-        <div class="batch-detail-in">${detail}</div>
-      </td>
-    </tr>`;
+			</td>
+			</tr>
+			<tr class="batch-detail" data-row="${i}" hidden>
+			<td colspan="7">
+				<div class="batch-detail-in">${detail}</div>
+			</td>
+			</tr>`;
 }
 
 async function ingest() {
@@ -734,28 +743,28 @@ async function ingest() {
     app.urls = [];
 
     $("#preview", main).innerHTML = `
-      <div class="ll-empty-preview">
-        <div class="ll-empty-icon"></div>
-        <b>No files selected</b>
-        <p>Your receipts will appear here.</p>
-      </div>`;
+			<div class="ll-empty-preview">
+				<div class="ll-empty-icon"></div>
+				<b>No files selected</b>
+				<p>Your receipts will appear here.</p>
+			</div>`;
 
     run.textContent = "Extract documents";
     $("#upload-note", main).textContent = "Choose files to start.";
   }
 
   $("#bactions", main).innerHTML = `
-    <button class="btn secondary small" type="button" id="csv">
-      Download CSV summary
-    </button>
-    ${
-      reviewCount
-        ? `
-      <button class="btn primary small" type="button" data-go="review">
-        Open review queue
-      </button>`
-        : ""
-    }`;
+			<button class="btn secondary small" type="button" id="csv">
+			Download CSV summary
+			</button>
+			${
+        reviewCount
+          ? `
+			<button class="btn primary small" type="button" data-go="review">
+				Open review queue
+			</button>`
+          : ""
+      }`;
 
   $("#csv", main).addEventListener("click", () => {
     download(csvText(done), `recordslens-batch-${Date.now()}.csv`);
@@ -799,10 +808,10 @@ async function review(fresh = false) {
   );
 
   area.innerHTML = `
-    <div class="review-count">${waiting}</div>
-    <div class="review-list">
-      ${list.map((item, i) => reviewItem(item, list.length === 1 && i === 0)).join("")}
-    </div>`;
+			<div class="review-count">${waiting}</div>
+			<div class="review-list">
+			${list.map((item, i) => reviewItem(item, list.length === 1 && i === 0)).join("")}
+			</div>`;
 
   $$('[data-do="reject"]', area).forEach((btn) => {
     btn.addEventListener("click", () => rejectOne(btn, list));
@@ -813,93 +822,119 @@ async function review(fresh = false) {
   });
 }
 
+function correctionRow({ id, idx, path, label, value, confidence, flag }) {
+  const why = flag && flag.reason ? ` &middot; ${esc(flag.reason)}` : "";
+  return `
+  <div class="correction-row">
+	<div>
+		<div class="ll-correction-label">${esc(label)}</div>
+		<div class="ll-correction-value">${esc(value === "" ? "-" : value)}</div>
+		<div class="ll-correction-help">Confidence ${pill(confidence)}${why}</div>
+	</div>
+	<div>
+		<label class="ll-correction-label" for="fix-${esc(id)}-${idx}">Corrected value</label>
+		<input class="text-input" id="fix-${esc(id)}-${idx}" data-f="${esc(path)}" data-old="${esc(value)}" value="${esc(value)}">
+	</div>
+  </div>`;
+}
+
 function reviewItem(item, open) {
   const id = String(item?.doc_id ?? "");
+  const list = Array.isArray(item?.flagged_fields) ? item.flagged_fields : [];
+  const FIELDS = [
+    "vendor",
+    "invoice_number",
+    "date",
+    "currency",
+    "subtotal",
+    "tax",
+    "discount",
+    "additional_charges",
+    "total",
+  ];
+
   const held = Array.isArray(item?.flagged_fields) ? item.flagged_fields : [];
+  const ex = item?.extraction || {};
+  const flagMap = new Map(list.map((f) => [String(f?.field_path ?? ""), f]));
+  const flaggedPaths = new Set(list.map((f) => String(f?.field_path ?? "")));
+  const lbl = fieldLabel;
 
-  const rows = held
-    .map((field, i) => {
-      const path = String(field?.field_path ?? "");
-      const value = String(field?.value ?? "");
-      const reason = String(
-        field?.reason ?? "This field requires manual review.",
-      );
+  const flaggedRows = list
+    .map((f, i) =>
+      correctionRow({
+        id,
+        idx: `f${i}`,
+        path: String(f?.field_path ?? ""),
+        label: lbl(String(f?.field_path ?? "")),
+        value: String(f?.value ?? ""),
+        confidence: f?.confidence,
+        flag: f,
+      }),
+    )
+    .join("");
 
-      return `
-      <div class="correction-row">
-        <div class="ll-flag-info">
-			<div class="ll-correction-label">${esc(title(path))}</div>
-
-			<div class="ll-correction-value">
-				${esc(value || "No value extracted")}
-			</div>
-
-			<div class="ll-flag-meta">
-				<span>Confidence ${pill(field?.confidence)}</span>
-			</div>
-
-			<div class="ll-flag-reason">
-				<strong>Why it was flagged</strong>
-				<span>${esc(reason)}</span>
-			</div>
-		</div>
-
-        <div>
-          <label class="ll-correction-label" for="fix-${esc(id)}-${i}">
-            Corrected value
-          </label>
-          <input
-            class="text-input"
-            id="fix-${esc(id)}-${i}"
-            data-f="${esc(path)}"
-            data-old="${esc(value)}"
-            value="${esc(value)}"
-          >
-        </div>
-      </div>`;
+  const otherRows = FIELDS.filter((k) => !flaggedPaths.has(k))
+    .map((k, i) => {
+      const node = ex[k] || { value: "", confidence: 0 };
+      const value = node?.value == null ? "" : String(node.value);
+      return correctionRow({
+        id,
+        idx: `o${i}`,
+        path: k,
+        label: title(k),
+        value,
+        confidence: node?.confidence,
+        flag: null,
+      });
     })
     .join("");
 
+  const rows =
+    flaggedRows +
+    (otherRows
+      ? `<details class="other-fields"><summary>Edit another field</summary>${otherRows}</details>`
+      : "");
+
   return `
-    <details class="review-item" data-id="${esc(id)}" ${open ? "open" : ""}>
-      <summary>
-        ${esc(item?.filename ?? "")} |
-        ${esc(id)} |
-        ${held.length} field${plural(held.length)} held
-      </summary>
+			<details class="review-item" data-id="${esc(id)}" ${open ? "open" : ""}>
+			<summary>
+				${esc(item?.filename ?? "")} |
+				${esc(id)} |
+				${held.length} field${plural(held.length)} held
+			</summary>
 
-      <div class="review-body">
-        <div class="review-grid">
-          <div>
-            <img
-              class="ll-doc-img"
-              src="${esc(join(item?.watermarked_image_url || ""))}"
-              alt="Watermarked document ${esc(id)}"
-            >
-          </div>
-          <div>${grid(item?.extraction || {})}</div>
-        </div>
+			<div class="review-body">
+				<div class="review-grid">
+				<div>
+					<img
+					class="ll-doc-img"
+					src="${esc(join(item?.watermarked_image_url || ""))}"
+					alt="Watermarked document ${esc(id)}"
+					>
+				</div>
+				<div>${grid(item?.extraction || {})}</div>
+				</div>
 
-        <div class="ll-rule">Fields requiring review</div>
-        ${rows}
+				<div class="ll-rule">Fields requiring review</div>
+				${rows}
 
-        <div class="form-row">
-          <label for="reason-${esc(id)}">Reason, if rejecting</label>
-          <input
-            class="text-input"
-            id="reason-${esc(id)}"
-            data-reason
-            value="Not a valid receipt/invoice"
-          >
-        </div>
+				<div class="form-row">
+				<label for="reason-${esc(id)}">Reason, if rejecting</label>
+				<input
+					class="text-input"
+					id="reason-${esc(id)}"
+					data-reason
+					value="Not a valid receipt/invoice"
+				>
+				</div>
 
-        <div class="review-actions">
-          <button class="btn primary" type="button" data-do="approve">Approve</button>
-          <button class="btn secondary" type="button" data-do="reject">Reject</button>
-          <span></span>
-        </div>
-      </div>
-    </details>`;
+				<div class="review-actions">
+				<button class="btn primary" type="button" data-do="approve">Approve</button>
+				<button class="btn secondary" type="button" data-do="reject">Reject</button>
+				<span></span>
+				</div>
+			</div>
+			</details>`;
 }
 
 function findReviewItem(btn, list) {
@@ -1044,29 +1079,29 @@ function recordsRow(item) {
     .replace("T", " at ");
 
   return `
-    <div class="records-row">
-      <div class="ll-row-text">
-        ${esc(item?.filename ?? "")}<br>
-        <span class="mono">${esc(id)}</span>
-      </div>
+			<div class="records-row">
+			<div class="ll-row-text">
+				${esc(item?.filename ?? "")}<br>
+				<span class="mono">${esc(id)}</span>
+			</div>
 
-      <div>${chip(item?.status)}</div>
-      <div class="ll-row-text">${esc(item?.vendor || "-")}</div>
-      <div class="ll-money-cell">${shown}</div>
-      <div class="ll-row-text"><span class="mono">${esc(time)}</span></div>
+			<div>${chip(item?.status)}</div>
+			<div class="ll-row-text">${esc(item?.vendor || "-")}</div>
+			<div class="ll-money-cell">${shown}</div>
+			<div class="ll-row-text"><span class="mono">${esc(time)}</span></div>
 
-      <button
-        class="btn ${open ? "primary" : "secondary"} small"
-        type="button"
-        data-do="open"
-        data-id="${esc(id)}"
-      >
-        ${open ? "Hide" : "Details"}
-      </button>
-    </div>
+			<button
+				class="btn ${open ? "primary" : "secondary"} small"
+				type="button"
+				data-do="open"
+				data-id="${esc(id)}"
+			>
+				${open ? "Hide" : "Details"}
+			</button>
+			</div>
 
-    <div class="ll-records-line"></div>
-    ${open ? recordDetail(item) : ""}`;
+			<div class="ll-records-line"></div>
+			${open ? recordDetail(item) : ""}`;
 }
 
 function recordDetail(item) {
@@ -1099,28 +1134,28 @@ function recordDetail(item) {
     : banner("pending", "No extracted record is stored for this document.");
 
   return `
-    <div class="detail">
-      <div class="detail-grid">
-        <div>
-          <img
-            class="ll-doc-img"
-            src="${esc(join(`/image/${encodeURIComponent(id)}`))}"
-            alt="Processed document ${esc(id)}"
-          >
-          <p class="caption">
-            The document id and UTC time are shown in the lower right.
-          </p>
-        </div>
+			<div class="detail">
+			<div class="detail-grid">
+				<div>
+				<img
+					class="ll-doc-img"
+					src="${esc(join(`/image/${encodeURIComponent(id)}`))}"
+					alt="Processed document ${esc(id)}"
+				>
+				<p class="caption">
+					The document id and UTC time are shown in the lower right.
+				</p>
+				</div>
 
-        <div>
-          <div class="ll-field-grid ll-field-grid-single">${info}</div>
-          <div class="ll-row-text">${esc(item?.filename ?? "")}</div>
-        </div>
-      </div>
+				<div>
+				<div class="ll-field-grid ll-field-grid-single">${info}</div>
+				<div class="ll-row-text">${esc(item?.filename ?? "")}</div>
+				</div>
+			</div>
 
-      ${reason}
-      ${body}
-    </div>`;
+			${reason}
+			${body}
+			</div>`;
 }
 
 function timeLeft(seconds) {

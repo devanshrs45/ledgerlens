@@ -33,7 +33,7 @@ EXTRACTION_PROMPT = (
     "- Currency must be an ISO 4217 code.\n"
     "- Subtotal must come from a printed Subtotal, Net Amount, Taxable Amount, or equivalent field. Do not derive it from total minus tax.\n"
     "- Tax must be the sum of all explicitly printed tax components such as CGST, SGST, IGST, VAT, or GST.\n"
-    "- Discount must be nonzero only when an explicit discount, coupon, rebate, saving, credit, or deduction is printed.\n"
+    "- Discount must be nonzero only when an explicit discount, coupon, rebate, saving, credit, less, off, or deduction is printed.\n"
     "- Additional charges must include only explicitly printed fees or charges.\n"
     "- Total must come from the printed Grand Total, Amount Payable, or Total field.\n"
     "- Preserve printed decimal values. Do not replace an exact total with a rounded value unless the document explicitly labels it Rounded Total.\n\n"
@@ -97,7 +97,7 @@ def extract_invoice(image_bytes: bytes, image_type: str = "image/png") -> Extrac
             messages=_messages(b64, image_type, schema_hint),
             response_format={"type": "json_object"},
             temperature=0,
-            max_tokens=2500,
+            max_tokens=4000,
             reasoning_effort="none"
         )   #calls model
         raw = _strip_fences(completion.choices[0].message.content or "{}")
@@ -142,9 +142,7 @@ def route_by_confidence(invoice: InvoiceSchema, threshold: float | None = None) 
                 value=str(invoice.overall_confidence),
                 confidence=invoice.overall_confidence,
                 reason=(
-                    f"Overall extraction confidence "
-                    f"({invoice.overall_confidence:.2f}) is below "
-                    f"the {threshold:.2f} review threshold."
+                    f"Overall extraction confidence ({invoice.overall_confidence:.2f}) is below the threshold."
                 ),
             )
         )
@@ -158,7 +156,7 @@ def route_by_confidence(invoice: InvoiceSchema, threshold: float | None = None) 
                     field_path=name,
                     value=str(node.value),
                     confidence=node.confidence,
-                    reason=f"Low confidence ({node.confidence:.2f}) — below the {threshold:.2f} review threshold."
+                    reason=f"Low confidence ({node.confidence:.2f}), below the threshold."
                 )
             )
 
@@ -205,7 +203,18 @@ def deterministic_rule_based_flags(invoice: InvoiceSchema) -> List[FlaggedField]
                 field_path="total",
                 value=str(invoice.total.value),
                 confidence=invoice.total.confidence,        #not 0.0 as mathematical error
-                reason=(f"Arithmetic does not tally correctly: subtotal {invoice.subtotal.value} + tax {invoice.tax.value} + charges {invoice.additional_charges.value} − discount {invoice.discount.value} ≠ total {invoice.total.value}.")
+                reason=(f"Arithmetic does not tally correctly: subtotal ({invoice.subtotal.value}) + tax ({invoice.tax.value}) + charges ({invoice.additional_charges.value}) − discount ({invoice.discount.value}) ≠ total ({invoice.total.value}).")
+            ))
+
+
+    if invoice.line_items and invoice.subtotal.value > 0:   #if total is 0, but sum of line items is not subtotal
+        items_sum = sum(item.amount for item in invoice.line_items)
+        if abs(items_sum - invoice.subtotal.value) > 0.02:
+            flags.append(FlaggedField(
+                field_path="line_items",
+                value=f"{items_sum:.2f}",
+                confidence=min((i.confidence for i in invoice.line_items), default=0.0),
+                reason=f"Items' total ({items_sum:.2f}) and subtotal ({invoice.subtotal.value:.2f}) is different."
             ))
 
     return flags    #return flagged fields

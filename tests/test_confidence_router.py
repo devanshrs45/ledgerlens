@@ -100,6 +100,15 @@ def test_reconciling_totals_not_flagged(valid_invoice_dict):
     flags = deterministic_rule_based_flags(invoice)
     assert not any(f.field_path == "total" and "tally" in (f.reason or "").lower()
                    for f in flags)
+    
+
+def test_line_items_not_summing_to_subtotal_flagged(valid_invoice_dict):
+    items = [{"description": "Only item", "quantity": 1.0,
+              "unit_price": 40.0, "amount": 40.0, "confidence": 0.95}]
+    invoice = InvoiceSchema.model_validate(
+        valid_invoice_dict(line_items=items))  # subtotal is 100.0
+    flags = deterministic_rule_based_flags(invoice)
+    assert any(f.field_path == "line_items" for f in flags)
 
 
 def test_broken_arithmetic_flagged(valid_invoice_dict):
